@@ -48,33 +48,28 @@ with st.form("agendamento"):
 
     # HORÁRIOS BASE
     horarios_base = [
-        "09:00", "09:30", "10:00", "10:30",
-        "11:00", "11:30", "12:00",
-        "14:00", "14:30", "15:00", "15:30",
-        "16:00", "16:30", "17:00", "17:30"
+        "09:00","09:30","10:00","10:30",
+        "11:00","11:30","12:00",
+        "14:00","14:30","15:00","15:30",
+        "16:00","16:30","17:00","17:30"
     ]
 
-    # OCUPADOS
     ocupados = df[df["Data"] == str(data)]["Hora"].astype(str).tolist()
-
-    # DISPONÍVEIS
     disponiveis = [h for h in horarios_base if h not in ocupados]
 
-    if disponiveis:
+    if len(disponiveis) > 0:
         hora = st.selectbox("Hora", disponiveis)
     else:
         st.warning("Sem horários disponíveis neste dia")
         hora = None
 
-    servico = st.selectbox(
-        "Serviço",
-        ["Corte", "Barba", "Corte + Barba"]
-    )
+    servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
 
     submitted = st.form_submit_button("Confirmar Marcação")
 
 # GUARDAR
 if submitted:
+
     if nome and telefone and hora:
 
         novo = pd.DataFrame([{
@@ -119,7 +114,7 @@ filtro_data = st.date_input("Ver agenda de:")
 
 agenda = df[df["Data"] == str(filtro_data)]
 
-if not agenda.empty:
+if len(agenda) > 0:
     st.dataframe(agenda.sort_values("Hora"))
 else:
     st.info("Sem marcações neste dia")
@@ -127,9 +122,7 @@ else:
 # LISTA COMPLETA
 st.subheader("📋 Todos os Agendamentos")
 
-if not df.empty:
+if len(df) > 0:
     st.dataframe(df)
 else:
     st.info("Sem dados ainda")
-else:
-    st.info("Ainda não há marcações.")
