@@ -4,10 +4,45 @@ import os
 from twilio.rest import Client
 
 # CONFIG
-st.set_page_config(page_title="BarberBook", page_icon="💈")
+st.set_page_config(
+    page_title="Mandelas Hair Studio Barbershop",
+    page_icon="💈",
+    layout="centered"
+)
 
-st.title("💈 BarberBook")
-st.subheader("📅 Marcar Corte")
+# 🎨 ESTILO PROFISSIONAL
+st.markdown("""
+    <style>
+    body {
+        background-color: #0e1117;
+    }
+    .main {
+        background-color: #0e1117;
+        color: white;
+    }
+    .stButton>button {
+        background-color: #f5c542;
+        color: black;
+        border-radius: 10px;
+        font-weight: bold;
+        padding: 10px;
+        width: 100%;
+    }
+    .stTextInput input {
+        border-radius: 8px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 🖼️ LOGO (JPEG)
+col1, col2, col3 = st.columns([1,2,1])
+with col2:
+    st.image("logo.jpg", width=300)
+
+st.markdown("<h2 style='text-align:center;'>Mandelas Hair Studio Barbershop</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:gray;'>Estilo • Precisão • Confiança</p>", unsafe_allow_html=True)
+
+st.markdown("---")
 
 # TWILIO
 account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
@@ -16,7 +51,7 @@ twilio_number = st.secrets["TWILIO_WHATSAPP_NUMBER"]
 
 client = Client(account_sid, auth_token)
 
-# FUNÇÃO WHATSAPP
+# WHATSAPP
 def enviar_whatsapp(numero, mensagem):
     try:
         client.messages.create(
@@ -29,7 +64,7 @@ def enviar_whatsapp(numero, mensagem):
         st.warning(f"Erro no WhatsApp: {e}")
         return False
 
-# NORMALIZAR TELEFONE
+# FORMATAR Nº
 def formatar_numero(numero):
     numero = numero.replace(" ", "")
     if not numero.startswith("+351"):
@@ -46,14 +81,14 @@ if not os.path.exists(FILE):
 df = pd.read_csv(FILE)
 
 # FORMULÁRIO
+st.subheader("📅 Marcar Corte")
+
 with st.form("agendamento"):
 
     nome = st.text_input("Nome")
     telefone = st.text_input("Telefone (ex: 925349904)")
-
     data = st.date_input("Data")
 
-    # HORÁRIOS BASE
     horarios_base = [
         "09:00","09:30","10:00","10:30",
         "11:00","11:30","12:00",
@@ -67,7 +102,7 @@ with st.form("agendamento"):
     if len(disponiveis) > 0:
         hora = st.selectbox("Hora", disponiveis)
     else:
-        st.warning("Sem horários disponíveis neste dia")
+        st.warning("Sem horários disponíveis")
         hora = None
 
     servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
@@ -93,7 +128,7 @@ if submitted:
         df.to_csv(FILE, index=False)
 
         mensagem = f"""
-💈 Barbearia
+💈 Mandelas Hair Studio
 
 Olá {nome}!
 
@@ -103,21 +138,22 @@ A tua marcação está confirmada:
 ⏰ {hora}
 ✂️ {servico}
 
-Até breve 👌
+Esperamos por ti 🔥
 """
 
         sucesso = enviar_whatsapp(telefone_formatado, mensagem)
 
         if sucesso:
-            st.success("✅ Marcação feita e WhatsApp enviado!")
+            st.success("✅ Marcação confirmada e WhatsApp enviado!")
         else:
             st.warning("Marcação guardada, mas erro no WhatsApp")
 
     else:
         st.error("Preenche todos os campos")
 
-# PAINEL BARBEIRO
-st.subheader("📅 Agenda do Dia")
+# AGENDA
+st.markdown("---")
+st.subheader("📅 Agenda")
 
 filtro_data = st.date_input("Ver agenda de:")
 
@@ -126,12 +162,10 @@ agenda = df[df["Data"] == str(filtro_data)]
 if len(agenda) > 0:
     st.dataframe(agenda.sort_values("Hora"))
 else:
-    st.info("Sem marcações neste dia")
+    st.info("Sem marcações")
 
-# LISTA COMPLETA
+# TODOS
+st.markdown("---")
 st.subheader("📋 Todos os Agendamentos")
 
-if len(df) > 0:
-    st.dataframe(df)
-else:
-    st.info("Sem dados ainda")
+st.dataframe(df)
