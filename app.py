@@ -29,6 +29,13 @@ def enviar_whatsapp(numero, mensagem):
         st.warning(f"Erro no WhatsApp: {e}")
         return False
 
+# NORMALIZAR TELEFONE
+def formatar_numero(numero):
+    numero = numero.replace(" ", "")
+    if not numero.startswith("+351"):
+        numero = "+351" + numero
+    return numero
+
 # CSV
 FILE = "dados.csv"
 
@@ -42,7 +49,7 @@ df = pd.read_csv(FILE)
 with st.form("agendamento"):
 
     nome = st.text_input("Nome")
-    telefone = st.text_input("Telefone (+351...)")
+    telefone = st.text_input("Telefone (ex: 925349904)")
 
     data = st.date_input("Data")
 
@@ -72,9 +79,11 @@ if submitted:
 
     if nome and telefone and hora:
 
+        telefone_formatado = formatar_numero(telefone)
+
         novo = pd.DataFrame([{
             "Nome": nome,
-            "Telefone": telefone,
+            "Telefone": telefone_formatado,
             "Data": str(data),
             "Hora": hora,
             "Serviço": servico
@@ -97,7 +106,7 @@ A tua marcação está confirmada:
 Até breve 👌
 """
 
-        sucesso = enviar_whatsapp(telefone, mensagem)
+        sucesso = enviar_whatsapp(telefone_formatado, mensagem)
 
         if sucesso:
             st.success("✅ Marcação feita e WhatsApp enviado!")
