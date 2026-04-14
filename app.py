@@ -5,19 +5,43 @@ from twilio.rest import Client
 
 # CONFIG
 st.set_page_config(
-    page_title="Mandelas Hair Studio Barbershop",
+    page_title="Mandelas Hair Studio",
     page_icon="💈",
     layout="centered"
 )
 
-# ESTILO
+# 🎨 ESTILO PREMIUM
 st.markdown("""
 <style>
+body {
+    background-color: #0e1117;
+}
+.main {
+    background-color: #0e1117;
+    color: white;
+}
+
+/* Botões normais */
 .stButton>button {
     width: 100%;
-    border-radius: 10px;
-    margin: 3px;
+    border-radius: 12px;
+    padding: 12px;
+    font-weight: bold;
+    background-color: #1f2937;
+    color: white;
 }
+
+/* Botão principal */
+div.stButton > button:first-child {
+    background-color: #f5c542;
+    color: black;
+}
+
+/* Inputs */
+.stTextInput input {
+    border-radius: 10px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -26,7 +50,9 @@ col1, col2, col3 = st.columns([1,2,1])
 with col2:
     st.image("logo.jpg", width=250)
 
-st.markdown("## 💈 Mandelas Hair Studio")
+st.markdown("<h2 style='text-align:center;'>Mandelas Hair Studio</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:gray;'>Reserva o teu corte em segundos</p>", unsafe_allow_html=True)
+
 st.markdown("---")
 
 # TWILIO
@@ -43,9 +69,8 @@ def enviar_whatsapp(numero, mensagem):
             from_=twilio_number,
             to=f"whatsapp:{numero}"
         )
-        return True
     except:
-        return False
+        pass
 
 def formatar_numero(numero):
     numero = numero.replace(" ", "")
@@ -62,12 +87,14 @@ if not os.path.exists(FILE):
 df = pd.read_csv(FILE)
 
 # INPUTS
+st.subheader("📅 Nova Marcação")
+
 nome = st.text_input("Nome")
-telefone = st.text_input("Telefone (ex: 925349904)")
+telefone = st.text_input("Telefone")
 data = st.date_input("Escolhe o dia")
 
 # HORÁRIOS
-st.subheader("⏰ Escolhe a hora")
+st.subheader("⏰ Horários disponíveis")
 
 horarios = [
     "09:00","09:30","10:00","10:30",
@@ -78,7 +105,7 @@ horarios = [
 
 ocupados = df[df["Data"] == str(data)]["Hora"].tolist()
 
-hora_escolhida = None
+hora_escolhida = st.session_state.get("hora", None)
 
 cols = st.columns(4)
 
@@ -87,12 +114,17 @@ for i, h in enumerate(horarios):
         cols[i % 4].button(f"{h} ❌", disabled=True)
     else:
         if cols[i % 4].button(h):
+            st.session_state["hora"] = h
             hora_escolhida = h
+
+# MOSTRAR ESCOLHA
+if hora_escolhida:
+    st.success(f"⏰ Hora selecionada: {hora_escolhida}")
 
 servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
 
-# CONFIRMAR
-if st.button("Confirmar Marcação"):
+# BOTÃO PRINCIPAL
+if st.button("💈 Confirmar Marcação"):
 
     if nome and telefone and hora_escolhida:
 
@@ -113,16 +145,22 @@ if st.button("Confirmar Marcação"):
 💈 Mandelas Hair Studio
 
 Olá {nome}!
-Marcaçao confirmada:
+
+A tua marcação está confirmada:
 
 📅 {data}
 ⏰ {hora_escolhida}
 ✂️ {servico}
+
+Até breve 🔥
 """
 
         enviar_whatsapp(telefone, mensagem)
 
-        st.success("✅ Marcado com sucesso!")
+        st.success("✅ Marcação confirmada!")
+
+        # limpar hora
+        st.session_state["hora"] = None
 
     else:
         st.error("Preenche tudo e escolhe uma hora")
