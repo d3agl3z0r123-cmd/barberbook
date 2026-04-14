@@ -1,130 +1,76 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
-import os
+from twilio.rest import Client
 
-st.set_page_config(page_title="BarberBook", layout="wide")
+# 🔑 TWILIO CONFIG
+account_sid = "ACf8bcfa107ea60ff92a1aa0f9847dfb27"
+auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
+twilio_number = "+17406699179"
 
-st.title("💈 BarberBook")
+client = Client(account_sid, auth_token)
 
+# 📂 Ficheiro CSV
 FILE = "dados.csv"
 
-barbeiros = ["Diogo (Martinez)", "Delcio Mandelas"]
-
-# gerar horários
-def gerar_horarios():
-    horarios = []
-    
-    hora = datetime.strptime("09:00", "%H:%M")
-    while hora < datetime.strptime("13:00", "%H:%M"):
-        horarios.append(hora.strftime("%H:%M"))
-        hora += pd.Timedelta(minutes=30)
-
-    hora = datetime.strptime("14:00", "%H:%M")
-    while hora < datetime.strptime("19:00", "%H:%M"):
-        horarios.append(hora.strftime("%H:%M"))
-        hora += pd.Timedelta(minutes=30)
-
-    return horarios
-
-horarios = gerar_horarios()
-
-# carregar dados
-if os.path.exists(FILE):
+# Criar ficheiro se não existir OU atualizar colunas
+try:
     df = pd.read_csv(FILE)
-else:
-    df = pd.DataFrame(columns=["Barbeiro", "Nome", "Data", "Hora"])
+except:
+    df = pd.DataFrame(columns=["Nome", "Telefone", "Data", "Hora", "Serviço"])
+    df.to_csv(FILE, index=False)
 
-# -------------------------
-# MENU
-# -------------------------
-menu = st.sidebar.radio("Menu", ["Cliente", "Barbeiro"])
+# Garantir colunas corretas (corrige dados antigos)
+colunas = ["Nome", "Telefone", "Data", "Hora", "Serviço"]
+for col in colunas:
+    if col not in df.columns:
+        df[col] = ""
 
-# =========================
-# CLIENTE
-# =========================
-if menu == "Cliente":
-    st.header("📲 Marcar Corte")
+df = df[colunas]
 
-    barbeiro = st.selectbox("Escolhe o barbeiro", barbeiros)
-    nome = st.text_input("O teu nome")
-    data = st.date_input("Escolhe a data")
+# 🎨 APP
+st.set_page_config(page_title="BarberBook", page_icon="💈")
+st.title("💈 BarberBook")
+st.subheader("📅 Marcar Corte")
 
-    ocupados = df[(df["Barbeiro"] == barbeiro) & (df["Data"] == str(data))]["Hora"].tolist()
-    disponiveis = [h for h in horarios if h not in ocupados]
+# 📌 FORMULÁRIO
+with st.form("agendamento"):
+    nome = st.text_input("Nome")
+    telefone = st.text_input("Telefone (+351...)")
+    data = st.date_input("Data")
+    hora = st.time_input("Hora")
+    servico = st.selectbox(
+        "Serviço",
+        ["Corte", "Barba", "Corte + Barba"]
+    )
 
-    if len(disponiveis) == 0:
-        st.error("Sem horários disponíveis neste dia")
-    else:
-        hora = st.selectbox("Escolhe a hora", disponiveis)
+    submitted = st.form_submit_button("Confirmar Marcação")
 
-        if st.button("Confirmar Marcação"):
-            novo = pd.DataFrame([{
-                "Barbeiro": barbeiro,
-                "Nome": nome,
-                "Data": str(data),
-                "Hora": hora
-            }])
+    if submitted:
+        if nome == "" or telefone == "":
+            st.warning("Preenche todos os campos!")
+        else:
+            novo = pd.DataFrame([[nome, telefone, data, hora, servico]],
+                                columns=colunas)
 
             df = pd.concat([df, novo], ignore_index=True)
             df.to_csv(FILE, index=False)
 
-            st.success(f"✅ Marcação confirmada para {hora}")
+            # 📩 ENVIAR SMS
+            try:
+                mensagem = f"Olá {nome}, o seu agendamento para {servico} está marcado para {data} às {hora} 💈"
 
-# =========================
-# BARBEIRO
-# =========================
-if menu == "Barbeiro":
-    st.header("📅 Gestão da Agenda")
+                client.messages.create(
+                    body=mensagem,
+                    from_=twilio_number,
+                    to=telefone
+                )
 
-    filtro_barbeiro = st.selectbox("Selecionar Barbeiro", barbeiros)
-    filtro_data = st.date_input("Selecionar Data", datetime.today())
+                st.success("✅ Agendamento guardado e SMS enviado!")
 
-    # 🔔 ALERTA 4 HORAS ANTES
-    agora = datetime.now()
-    daqui_4h = agora + timedelta(hours=4)
+            except Exception as e:
+                st.warning("⚠️ Agendamento guardado, mas erro no SMS")
+                st.text(e)
 
-    st.subheader("🔔 Próximos cortes (até 4h)")
-
-    for i, row in df.iterrows():
-        data_hora_str = f"{row['Data']} {row['Hora']}"
-        data_hora = datetime.strptime(data_hora_str, "%Y-%m-%d %H:%M")
-
-        if agora <= data_hora <= daqui_4h:
-            st.warning(f"{row['Hora']} - {row['Nome']} ({row['Barbeiro']})")
-
-    # agenda normal
-    agenda = df[
-        (df["Barbeiro"] == filtro_barbeiro) &
-        (df["Data"] == str(filtro_data))
-    ]
-
-    for h in horarios:
-        slot = agenda[agenda["Hora"] == h]
-        
-        if not slot.empty:
-            nome_cliente = slot.iloc[0]["Nome"]
-            col1, col2 = st.columns([3,1])
-            
-            with col1:
-                st.error(f"{h} - {nome_cliente}")
-            
-            with col2:
-                pin = st.text_input(f"PIN {h}", type="password", key=f"pin_{h}")
-                
-                if st.button(f"Apagar {h}", key=f"btn_{h}"):
-
-                    if filtro_barbeiro == "Diogo (Martinez)" and pin == "1111":
-                        df = df.drop(slot.index)
-
-                    elif filtro_barbeiro == "Delcio Mandelas" and pin == "2222":
-                        df = df.drop(slot.index)
-
-                    else:
-                        st.error("PIN incorreto")
-                        st.stop()
-
-                    df.to_csv(FILE, index=False)
-                    st.rerun()
-        else:
-            st.success(f"{h} - Livre")
+# 📋 LISTA
+st.subheader("📋 Agendamentos")
+st.dataframe(df)
