@@ -4,7 +4,7 @@ from twilio.rest import Client
 
 # 🔑 TWILIO CONFIG
 account_sid = "ACf8bcfa107ea60ff92a1aa0f9847dfb27"
-auth_token = st.secrets["85764297dea3b9a7a2754275629c6fef"]
+auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
 twilio_number = "+17406699179"
 
 client = Client(account_sid, auth_token)
