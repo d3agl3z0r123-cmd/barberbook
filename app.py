@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-from twilio.rest import Client
 import os
+from twilio.rest import Client
 
 # CONFIG
 st.set_page_config(page_title="BarberBook", page_icon="💈")
@@ -10,14 +9,14 @@ st.set_page_config(page_title="BarberBook", page_icon="💈")
 st.title("💈 BarberBook")
 st.subheader("📅 Marcar Corte")
 
-# TWILIO CONFIG
+# TWILIO
 account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
 auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
 twilio_number = st.secrets["TWILIO_WHATSAPP_NUMBER"]
 
 client = Client(account_sid, auth_token)
 
-# FUNÇÃO PARA ENVIAR WHATSAPP
+# FUNÇÃO WHATSAPP
 def enviar_whatsapp(numero, mensagem):
     try:
         client.messages.create(
@@ -27,23 +26,45 @@ def enviar_whatsapp(numero, mensagem):
         )
         return True
     except Exception as e:
-        st.warning(f"Agendamento guardado, mas erro no WhatsApp: {e}")
+        st.warning(f"Erro no WhatsApp: {e}")
         return False
 
-# FICHEIRO CSV
+# CSV
 FILE = "dados.csv"
 
-# SE NÃO EXISTIR, CRIAR
 if not os.path.exists(FILE):
     df = pd.DataFrame(columns=["Nome", "Telefone", "Data", "Hora", "Serviço"])
     df.to_csv(FILE, index=False)
 
+df = pd.read_csv(FILE)
+
 # FORMULÁRIO
 with st.form("agendamento"):
+
     nome = st.text_input("Nome")
     telefone = st.text_input("Telefone (+351...)")
+
     data = st.date_input("Data")
-    hora = st.time_input("Hora")
+
+    # HORÁRIOS BASE
+    horarios_base = [
+        "09:00", "09:30", "10:00", "10:30",
+        "11:00", "11:30", "12:00",
+        "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00", "17:30"
+    ]
+
+    # OCUPADOS
+    ocupados = df[df["Data"] == str(data)]["Hora"].astype(str).tolist()
+
+    # DISPONÍVEIS
+    disponiveis = [h for h in horarios_base if h not in ocupados]
+
+    if disponiveis:
+        hora = st.selectbox("Hora", disponiveis)
+    else:
+        st.warning("Sem horários disponíveis neste dia")
+        hora = None
 
     servico = st.selectbox(
         "Serviço",
@@ -52,34 +73,33 @@ with st.form("agendamento"):
 
     submitted = st.form_submit_button("Confirmar Marcação")
 
-# AO SUBMETER
+# GUARDAR
 if submitted:
-    if nome and telefone:
-        # GUARDAR DADOS
+    if nome and telefone and hora:
+
         novo = pd.DataFrame([{
             "Nome": nome,
             "Telefone": telefone,
-            "Data": data,
+            "Data": str(data),
             "Hora": hora,
             "Serviço": servico
         }])
 
-        df = pd.read_csv(FILE)
         df = pd.concat([df, novo], ignore_index=True)
         df.to_csv(FILE, index=False)
 
-        # MENSAGEM WHATSAPP
         mensagem = f"""
-💈 BarberBook
+💈 Barbearia
 
 Olá {nome}!
+
 A tua marcação está confirmada:
 
-📅 Data: {data}
-⏰ Hora: {hora}
-✂️ Serviço: {servico}
+📅 {data}
+⏰ {hora}
+✂️ {servico}
 
-Obrigado! 🙌
+Até breve 👌
 """
 
         sucesso = enviar_whatsapp(telefone, mensagem)
@@ -87,17 +107,29 @@ Obrigado! 🙌
         if sucesso:
             st.success("✅ Marcação feita e WhatsApp enviado!")
         else:
-            st.warning("⚠️ Marcação guardada, mas erro no envio do WhatsApp.")
+            st.warning("Marcação guardada, mas erro no WhatsApp")
 
     else:
-        st.error("Preenche todos os campos!")
+        st.error("Preenche todos os campos")
 
-# MOSTRAR AGENDAMENTOS
-st.subheader("📋 Agendamentos")
+# PAINEL BARBEIRO
+st.subheader("📅 Agenda do Dia")
 
-df = pd.read_csv(FILE)
+filtro_data = st.date_input("Ver agenda de:")
+
+agenda = df[df["Data"] == str(filtro_data)]
+
+if not agenda.empty:
+    st.dataframe(agenda.sort_values("Hora"))
+else:
+    st.info("Sem marcações neste dia")
+
+# LISTA COMPLETA
+st.subheader("📋 Todos os Agendamentos")
 
 if not df.empty:
     st.dataframe(df)
+else:
+    st.info("Sem dados ainda")
 else:
     st.info("Ainda não há marcações.")
