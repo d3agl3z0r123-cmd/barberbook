@@ -1,16 +1,10 @@
 import streamlit as st
 import pandas as pd
 import os
-from twilio.rest import Client
+import urllib.parse
 
 # CONFIG
 st.set_page_config(page_title="Mandelas Hair Studio", page_icon="💈")
-
-# USERS
-USERS = {
-    "Diogo": "1234",
-    "Delcio": "1234"
-}
 
 # PREÇOS
 PREÇOS = {
@@ -19,30 +13,22 @@ PREÇOS = {
     "Corte + Barba": 15
 }
 
-# TWILIO
-account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
-auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
-twilio_number = st.secrets["TWILIO_WHATSAPP_NUMBER"]
-
-client = Client(account_sid, auth_token)
-
-def enviar_whatsapp(numero, mensagem):
-    try:
-        client.messages.create(
-            body=mensagem,
-            from_=twilio_number,
-            to=f"whatsapp:{numero}"
-        )
-    except:
-        pass
+# FUNÇÃO WHATSAPP DIRETO
+def abrir_whatsapp(numero, mensagem):
+    numero = numero.replace("+", "")
+    mensagem = urllib.parse.quote(mensagem)
+    link = f"https://wa.me/{numero}?text={mensagem}"
+    return link
 
 def formatar_numero(numero):
+    numero = numero.replace(" ", "")
     if not numero.startswith("+351"):
         numero = "+351" + numero
     return numero
 
 # CSV
 FILE = "dados.csv"
+
 if not os.path.exists(FILE):
     df = pd.DataFrame(columns=["Nome","Telefone","Data","Hora","Serviço","Barbeiro"])
     df.to_csv(FILE, index=False)
@@ -58,8 +44,11 @@ modo = st.radio("Escolhe:", ["Cliente", "Barbeiro"])
 # ================= CLIENTE =================
 if modo == "Cliente":
 
+    st.subheader("📅 Nova Marcação")
+
     nome = st.text_input("Nome")
     telefone = st.text_input("Telefone")
+
     data = st.date_input("Data")
 
     barbeiro = st.selectbox("Escolhe o barbeiro", ["Diogo", "Delcio"])
@@ -85,9 +74,12 @@ if modo == "Cliente":
                 st.session_state["hora"] = h
                 hora_escolhida = h
 
+    if hora_escolhida:
+        st.success(f"⏰ Hora selecionada: {hora_escolhida}")
+
     servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
 
-    if st.button("Confirmar"):
+    if st.button("💈 Confirmar Marcação"):
 
         if nome and telefone and hora_escolhida:
 
@@ -110,20 +102,34 @@ if modo == "Cliente":
 
 Olá {nome}!
 
+A tua marcação está confirmada:
+
 📅 {data}
 ⏰ {hora_escolhida}
 ✂️ {servico}
 👤 {barbeiro}
+
+Até breve 🔥
 """
 
-            enviar_whatsapp(telefone, mensagem)
+            link = abrir_whatsapp(telefone, mensagem)
 
             st.success("✅ Marcação feita!")
 
+            st.markdown(f"👉 [📲 Confirmar no WhatsApp]({link})")
+
             st.session_state["hora"] = None
+
+        else:
+            st.error("Preenche todos os campos")
 
 # ================= BARBEIRO =================
 else:
+
+    USERS = {
+        "Diogo": "1234",
+        "Delcio": "1234"
+    }
 
     user = st.selectbox("Barbeiro", ["Diogo", "Delcio"])
     password = st.text_input("Password", type="password")
@@ -142,9 +148,10 @@ else:
         col1.metric("💰 Total", f"{total}€")
         col2.metric("📅 Hoje", f"{hoje}€")
 
-        st.subheader("Agenda")
+        st.subheader("📅 Agenda")
 
         for i, row in df_user.iterrows():
+
             col1, col2, col3, col4 = st.columns([2,2,2,1])
 
             col1.write(row["Data"])
@@ -154,7 +161,7 @@ else:
             if col4.button("❌", key=i):
                 df = df.drop(i)
                 df.to_csv(FILE, index=False)
-                st.experimental_rerun()
+                st.rerun()
 
     elif password:
         st.error("Password errada")
