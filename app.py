@@ -4,33 +4,20 @@ import os
 from twilio.rest import Client
 
 # CONFIG
-st.set_page_config(
-    page_title="Mandelas Hair Studio",
-    page_icon="💈",
-    layout="centered"
-)
+st.set_page_config(page_title="Mandelas Hair Studio", page_icon="💈")
 
-# PASSWORD BARBEIRO
-PASSWORD = "1234"  # 🔥 MUDA ISTO!
-
-# ESTILO
-st.markdown("""
-<style>
-.stButton>button {
-    width: 100%;
-    border-radius: 12px;
-    padding: 12px;
+# USERS
+USERS = {
+    "Diogo": "1234",
+    "Delcio": "1234"
 }
-</style>
-""", unsafe_allow_html=True)
 
-# LOGO
-col1, col2, col3 = st.columns([1,2,1])
-with col2:
-    st.image("logo.jpg", width=250)
-
-st.markdown("## 💈 Mandelas Hair Studio")
-st.markdown("---")
+# PREÇOS
+PREÇOS = {
+    "Corte": 10,
+    "Barba": 5,
+    "Corte + Barba": 15
+}
 
 # TWILIO
 account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
@@ -57,22 +44,25 @@ def formatar_numero(numero):
 # CSV
 FILE = "dados.csv"
 if not os.path.exists(FILE):
-    df = pd.DataFrame(columns=["Nome","Telefone","Data","Hora","Serviço"])
+    df = pd.DataFrame(columns=["Nome","Telefone","Data","Hora","Serviço","Barbeiro"])
     df.to_csv(FILE, index=False)
 
 df = pd.read_csv(FILE)
 
-# MENU
+# LOGO
+st.image("logo.jpg", width=250)
+st.title("💈 Mandelas Hair Studio")
+
 modo = st.radio("Escolhe:", ["Cliente", "Barbeiro"])
 
 # ================= CLIENTE =================
 if modo == "Cliente":
 
-    st.subheader("📅 Nova Marcação")
-
     nome = st.text_input("Nome")
     telefone = st.text_input("Telefone")
     data = st.date_input("Data")
+
+    barbeiro = st.selectbox("Escolhe o barbeiro", ["Diogo", "Delcio"])
 
     horarios = [
         "09:00","09:30","10:00","10:30",
@@ -81,7 +71,7 @@ if modo == "Cliente":
         "16:00","16:30","17:00","17:30"
     ]
 
-    ocupados = df[df["Data"] == str(data)]["Hora"].tolist()
+    ocupados = df[(df["Data"] == str(data)) & (df["Barbeiro"] == barbeiro)]["Hora"].tolist()
 
     hora_escolhida = st.session_state.get("hora", None)
 
@@ -94,9 +84,6 @@ if modo == "Cliente":
             if cols[i % 4].button(h):
                 st.session_state["hora"] = h
                 hora_escolhida = h
-
-    if hora_escolhida:
-        st.success(f"Hora: {hora_escolhida}")
 
     servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
 
@@ -111,7 +98,8 @@ if modo == "Cliente":
                 "Telefone": telefone,
                 "Data": str(data),
                 "Hora": hora_escolhida,
-                "Serviço": servico
+                "Serviço": servico,
+                "Barbeiro": barbeiro
             }])
 
             df = pd.concat([df, novo], ignore_index=True)
@@ -121,36 +109,52 @@ if modo == "Cliente":
 💈 Mandelas Hair Studio
 
 Olá {nome}!
-Marcaçao confirmada:
 
 📅 {data}
 ⏰ {hora_escolhida}
 ✂️ {servico}
+👤 {barbeiro}
 """
 
             enviar_whatsapp(telefone, mensagem)
 
-            st.success("✅ Marcado!")
+            st.success("✅ Marcação feita!")
 
             st.session_state["hora"] = None
-
-        else:
-            st.error("Preenche tudo")
 
 # ================= BARBEIRO =================
 else:
 
-    st.subheader("🔐 Área do Barbeiro")
+    user = st.selectbox("Barbeiro", ["Diogo", "Delcio"])
+    password = st.text_input("Password", type="password")
 
-    password_input = st.text_input("Password", type="password")
+    if USERS.get(user) == password:
 
-    if password_input == PASSWORD:
+        st.success(f"Bem-vindo {user}")
 
-        st.success("Acesso autorizado")
+        df_user = df[df["Barbeiro"] == user]
 
-        st.subheader("📅 Agenda")
+        # DASHBOARD
+        total = df_user["Serviço"].map(PREÇOS).sum()
+        hoje = df_user[df_user["Data"] == str(pd.to_datetime("today").date())]["Serviço"].map(PREÇOS).sum()
 
-        st.dataframe(df.sort_values(["Data","Hora"]))
+        col1, col2 = st.columns(2)
+        col1.metric("💰 Total", f"{total}€")
+        col2.metric("📅 Hoje", f"{hoje}€")
 
-    elif password_input:
+        st.subheader("Agenda")
+
+        for i, row in df_user.iterrows():
+            col1, col2, col3, col4 = st.columns([2,2,2,1])
+
+            col1.write(row["Data"])
+            col2.write(row["Hora"])
+            col3.write(row["Nome"])
+
+            if col4.button("❌", key=i):
+                df = df.drop(i)
+                df.to_csv(FILE, index=False)
+                st.experimental_rerun()
+
+    elif password:
         st.error("Password errada")
