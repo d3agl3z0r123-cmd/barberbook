@@ -10,38 +10,17 @@ st.set_page_config(
     layout="centered"
 )
 
-# 🎨 ESTILO PREMIUM
+# PASSWORD BARBEIRO
+PASSWORD = "1234"  # 🔥 MUDA ISTO!
+
+# ESTILO
 st.markdown("""
 <style>
-body {
-    background-color: #0e1117;
-}
-.main {
-    background-color: #0e1117;
-    color: white;
-}
-
-/* Botões normais */
 .stButton>button {
     width: 100%;
     border-radius: 12px;
     padding: 12px;
-    font-weight: bold;
-    background-color: #1f2937;
-    color: white;
 }
-
-/* Botão principal */
-div.stButton > button:first-child {
-    background-color: #f5c542;
-    color: black;
-}
-
-/* Inputs */
-.stTextInput input {
-    border-radius: 10px;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -50,9 +29,7 @@ col1, col2, col3 = st.columns([1,2,1])
 with col2:
     st.image("logo.jpg", width=250)
 
-st.markdown("<h2 style='text-align:center;'>Mandelas Hair Studio</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:gray;'>Reserva o teu corte em segundos</p>", unsafe_allow_html=True)
-
+st.markdown("## 💈 Mandelas Hair Studio")
 st.markdown("---")
 
 # TWILIO
@@ -73,7 +50,6 @@ def enviar_whatsapp(numero, mensagem):
         pass
 
 def formatar_numero(numero):
-    numero = numero.replace(" ", "")
     if not numero.startswith("+351"):
         numero = "+351" + numero
     return numero
@@ -86,87 +62,95 @@ if not os.path.exists(FILE):
 
 df = pd.read_csv(FILE)
 
-# INPUTS
-st.subheader("📅 Nova Marcação")
+# MENU
+modo = st.radio("Escolhe:", ["Cliente", "Barbeiro"])
 
-nome = st.text_input("Nome")
-telefone = st.text_input("Telefone")
-data = st.date_input("Escolhe o dia")
+# ================= CLIENTE =================
+if modo == "Cliente":
 
-# HORÁRIOS
-st.subheader("⏰ Horários disponíveis")
+    st.subheader("📅 Nova Marcação")
 
-horarios = [
-    "09:00","09:30","10:00","10:30",
-    "11:00","11:30","12:00",
-    "14:00","14:30","15:00","15:30",
-    "16:00","16:30","17:00","17:30"
-]
+    nome = st.text_input("Nome")
+    telefone = st.text_input("Telefone")
+    data = st.date_input("Data")
 
-ocupados = df[df["Data"] == str(data)]["Hora"].tolist()
+    horarios = [
+        "09:00","09:30","10:00","10:30",
+        "11:00","11:30","12:00",
+        "14:00","14:30","15:00","15:30",
+        "16:00","16:30","17:00","17:30"
+    ]
 
-hora_escolhida = st.session_state.get("hora", None)
+    ocupados = df[df["Data"] == str(data)]["Hora"].tolist()
 
-cols = st.columns(4)
+    hora_escolhida = st.session_state.get("hora", None)
 
-for i, h in enumerate(horarios):
-    if h in ocupados:
-        cols[i % 4].button(f"{h} ❌", disabled=True)
-    else:
-        if cols[i % 4].button(h):
-            st.session_state["hora"] = h
-            hora_escolhida = h
+    cols = st.columns(4)
 
-# MOSTRAR ESCOLHA
-if hora_escolhida:
-    st.success(f"⏰ Hora selecionada: {hora_escolhida}")
+    for i, h in enumerate(horarios):
+        if h in ocupados:
+            cols[i % 4].button(f"{h} ❌", disabled=True)
+        else:
+            if cols[i % 4].button(h):
+                st.session_state["hora"] = h
+                hora_escolhida = h
 
-servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
+    if hora_escolhida:
+        st.success(f"Hora: {hora_escolhida}")
 
-# BOTÃO PRINCIPAL
-if st.button("💈 Confirmar Marcação"):
+    servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
 
-    if nome and telefone and hora_escolhida:
+    if st.button("Confirmar"):
 
-        telefone = formatar_numero(telefone)
+        if nome and telefone and hora_escolhida:
 
-        novo = pd.DataFrame([{
-            "Nome": nome,
-            "Telefone": telefone,
-            "Data": str(data),
-            "Hora": hora_escolhida,
-            "Serviço": servico
-        }])
+            telefone = formatar_numero(telefone)
 
-        df = pd.concat([df, novo], ignore_index=True)
-        df.to_csv(FILE, index=False)
+            novo = pd.DataFrame([{
+                "Nome": nome,
+                "Telefone": telefone,
+                "Data": str(data),
+                "Hora": hora_escolhida,
+                "Serviço": servico
+            }])
 
-        mensagem = f"""
+            df = pd.concat([df, novo], ignore_index=True)
+            df.to_csv(FILE, index=False)
+
+            mensagem = f"""
 💈 Mandelas Hair Studio
 
 Olá {nome}!
-
-A tua marcação está confirmada:
+Marcaçao confirmada:
 
 📅 {data}
 ⏰ {hora_escolhida}
 ✂️ {servico}
-
-Até breve 🔥
 """
 
-        enviar_whatsapp(telefone, mensagem)
+            enviar_whatsapp(telefone, mensagem)
 
-        st.success("✅ Marcação confirmada!")
+            st.success("✅ Marcado!")
 
-        # limpar hora
-        st.session_state["hora"] = None
+            st.session_state["hora"] = None
 
-    else:
-        st.error("Preenche tudo e escolhe uma hora")
+        else:
+            st.error("Preenche tudo")
 
-# AGENDA
-st.markdown("---")
-st.subheader("📅 Agenda")
+# ================= BARBEIRO =================
+else:
 
-st.dataframe(df.sort_values(["Data","Hora"]))
+    st.subheader("🔐 Área do Barbeiro")
+
+    password_input = st.text_input("Password", type="password")
+
+    if password_input == PASSWORD:
+
+        st.success("Acesso autorizado")
+
+        st.subheader("📅 Agenda")
+
+        st.dataframe(df.sort_values(["Data","Hora"]))
+
+    elif password_input:
+        st.error("Password errada")
