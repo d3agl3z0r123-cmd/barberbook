@@ -10,38 +10,23 @@ st.set_page_config(
     layout="centered"
 )
 
-# 🎨 ESTILO PROFISSIONAL
+# ESTILO
 st.markdown("""
-    <style>
-    body {
-        background-color: #0e1117;
-    }
-    .main {
-        background-color: #0e1117;
-        color: white;
-    }
-    .stButton>button {
-        background-color: #f5c542;
-        color: black;
-        border-radius: 10px;
-        font-weight: bold;
-        padding: 10px;
-        width: 100%;
-    }
-    .stTextInput input {
-        border-radius: 8px;
-    }
-    </style>
+<style>
+.stButton>button {
+    width: 100%;
+    border-radius: 10px;
+    margin: 3px;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# 🖼️ LOGO (JPEG)
+# LOGO
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
-    st.image("logo.jpg", width=300)
+    st.image("logo.jpg", width=250)
 
-st.markdown("<h2 style='text-align:center;'>Mandelas Hair Studio Barbershop</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:gray;'>Estilo • Precisão • Confiança</p>", unsafe_allow_html=True)
-
+st.markdown("## 💈 Mandelas Hair Studio")
 st.markdown("---")
 
 # TWILIO
@@ -51,7 +36,6 @@ twilio_number = st.secrets["TWILIO_WHATSAPP_NUMBER"]
 
 client = Client(account_sid, auth_token)
 
-# WHATSAPP
 def enviar_whatsapp(numero, mensagem):
     try:
         client.messages.create(
@@ -60,11 +44,9 @@ def enviar_whatsapp(numero, mensagem):
             to=f"whatsapp:{numero}"
         )
         return True
-    except Exception as e:
-        st.warning(f"Erro no WhatsApp: {e}")
+    except:
         return False
 
-# FORMATAR Nº
 def formatar_numero(numero):
     numero = numero.replace(" ", "")
     if not numero.startswith("+351"):
@@ -73,54 +55,54 @@ def formatar_numero(numero):
 
 # CSV
 FILE = "dados.csv"
-
 if not os.path.exists(FILE):
-    df = pd.DataFrame(columns=["Nome", "Telefone", "Data", "Hora", "Serviço"])
+    df = pd.DataFrame(columns=["Nome","Telefone","Data","Hora","Serviço"])
     df.to_csv(FILE, index=False)
 
 df = pd.read_csv(FILE)
 
-# FORMULÁRIO
-st.subheader("📅 Marcar Corte")
+# INPUTS
+nome = st.text_input("Nome")
+telefone = st.text_input("Telefone (ex: 925349904)")
+data = st.date_input("Escolhe o dia")
 
-with st.form("agendamento"):
+# HORÁRIOS
+st.subheader("⏰ Escolhe a hora")
 
-    nome = st.text_input("Nome")
-    telefone = st.text_input("Telefone (ex: 925349904)")
-    data = st.date_input("Data")
+horarios = [
+    "09:00","09:30","10:00","10:30",
+    "11:00","11:30","12:00",
+    "14:00","14:30","15:00","15:30",
+    "16:00","16:30","17:00","17:30"
+]
 
-    horarios_base = [
-        "09:00","09:30","10:00","10:30",
-        "11:00","11:30","12:00",
-        "14:00","14:30","15:00","15:30",
-        "16:00","16:30","17:00","17:30"
-    ]
+ocupados = df[df["Data"] == str(data)]["Hora"].tolist()
 
-    ocupados = df[df["Data"] == str(data)]["Hora"].astype(str).tolist()
-    disponiveis = [h for h in horarios_base if h not in ocupados]
+hora_escolhida = None
 
-    if len(disponiveis) > 0:
-        hora = st.selectbox("Hora", disponiveis)
+cols = st.columns(4)
+
+for i, h in enumerate(horarios):
+    if h in ocupados:
+        cols[i % 4].button(f"{h} ❌", disabled=True)
     else:
-        st.warning("Sem horários disponíveis")
-        hora = None
+        if cols[i % 4].button(h):
+            hora_escolhida = h
 
-    servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
+servico = st.selectbox("Serviço", ["Corte", "Barba", "Corte + Barba"])
 
-    submitted = st.form_submit_button("Confirmar Marcação")
+# CONFIRMAR
+if st.button("Confirmar Marcação"):
 
-# GUARDAR
-if submitted:
+    if nome and telefone and hora_escolhida:
 
-    if nome and telefone and hora:
-
-        telefone_formatado = formatar_numero(telefone)
+        telefone = formatar_numero(telefone)
 
         novo = pd.DataFrame([{
             "Nome": nome,
-            "Telefone": telefone_formatado,
+            "Telefone": telefone,
             "Data": str(data),
-            "Hora": hora,
+            "Hora": hora_escolhida,
             "Serviço": servico
         }])
 
@@ -131,41 +113,22 @@ if submitted:
 💈 Mandelas Hair Studio
 
 Olá {nome}!
-
-A tua marcação está confirmada:
+Marcaçao confirmada:
 
 📅 {data}
-⏰ {hora}
+⏰ {hora_escolhida}
 ✂️ {servico}
-
-Esperamos por ti 🔥
 """
 
-        sucesso = enviar_whatsapp(telefone_formatado, mensagem)
+        enviar_whatsapp(telefone, mensagem)
 
-        if sucesso:
-            st.success("✅ Marcação confirmada e WhatsApp enviado!")
-        else:
-            st.warning("Marcação guardada, mas erro no WhatsApp")
+        st.success("✅ Marcado com sucesso!")
 
     else:
-        st.error("Preenche todos os campos")
+        st.error("Preenche tudo e escolhe uma hora")
 
 # AGENDA
 st.markdown("---")
 st.subheader("📅 Agenda")
 
-filtro_data = st.date_input("Ver agenda de:")
-
-agenda = df[df["Data"] == str(filtro_data)]
-
-if len(agenda) > 0:
-    st.dataframe(agenda.sort_values("Hora"))
-else:
-    st.info("Sem marcações")
-
-# TODOS
-st.markdown("---")
-st.subheader("📋 Todos os Agendamentos")
-
-st.dataframe(df)
+st.dataframe(df.sort_values(["Data","Hora"]))
